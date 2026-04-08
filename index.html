@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>Stellar Explorer</title>
+<style>*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html,body{height:100%;background:#060c14;overflow:hidden}#root{height:100dvh;overflow-y:auto;background:#060c14}</style>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet"/>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+firebase.initializeApp({apiKey:"AIzaSyBLXLxqMV6oL4SWtdAd-G1xq2AeeabjgIk",authDomain:"stellarexplorer-5f0a7.firebaseapp.com",databaseURL:"https://stellarexplorer-5f0a7-default-rtdb.firebaseio.com",projectId:"stellarexplorer-5f0a7",storageBucket:"stellarexplorer-5f0a7.firebasestorage.app",messagingSenderId:"866097032542",appId:"1:866097032542:web:833c7f35cf36773f39b3cf"});
+</script>
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+const RESOURCES = [
+  { id:"agua",       label:"AGUA",       icon:"💧", color:"#00bfff", rgb:"0,191,255",   sound:"water"    },
+  { id:"ali",        label:"ALIMENTO",   icon:"🌿", color:"#50e040", rgb:"80,224,64",   sound:"nature"   },
+  { id:"ener",       label:"ENERGIA",    icon:"⚡", color:"#ffcc00", rgb:"255,204,0",   sound:"electric" },
+  { id:"mineral",    label:"MINERAL",    icon:"⛏",  color:"#cc8844", rgb:"204,136,68",  sound:"rock"     },
+  { id:"ciencia",    label:"CIENCIA",    icon:"🔬", color:"#cc66ff", rgb:"204,102,255", sound:"science"  },
+  { id:"propulsion", label:"PROPULSION", icon:"🚀", color:"#ff6030", rgb:"255,96,48",   sound:"propuls"  },
+];
+
+const PLANETS = [
+  { id:"aqua",     label:"AQUA",     icon:"🌊", color:"#00d4ff", sound:"ocean"   },
+  { id:"pyron",    label:"PYRON",    icon:"🔥", color:"#ff4400", sound:"fire"    },
+  { id:"terraza",  label:"TERRAX",   icon:"⛏",  color:"#bb7733", sound:"mineral" },
+  { id:"verdia",   label:"VERDIA",   icon:"🌱", color:"#44dd55", sound:"forest"  },
+  { id:"neuronix", label:"NEURONIX", icon:"🧬", color:"#bb44ff", sound:"tech"    },
+  { id:"voidra",   label:"VOIDRA",   icon:"🎲", color:"#ffdd00", sound:"casino"  },
+  { id:"solaris",  label:"SOLARIS",  icon:"☀",  color:"#88ff44", sound:"solar"   },
+];
+
+const SHIP_ICONS = ["🛸","🚀","🛩","🌍","🪐","🔭","🌌","💫","⭐","🌑","🌠","☄"];
+
+const PLAYER_COLORS = [
+  { id:"cyan",   hex:"#00c8ff" },
+  { id:"green",  hex:"#00ff9d" },
+  { id:"purple", hex:"#cc66ff" },
+  { id:"orange", hex:"#ff8800" },
+  { id:"pink",   hex:"#ff44aa" },
+  { id:"yellow", hex:"#ffdd00" },
+];
+
+const PLANET_START_ORDER = [
+  { planetId:"verdia",   name:"VERDIA",   icon:"🌱", note:"Gratis Early" },
+  { planetId:"aqua",     name:"AQUA",     icon:"🌊", note:"1⚡ Early"    },
+  { planetId:"pyron",    name:"PYRON",    icon:"🔥", note:"Gratis Riesgo"},
+  { planetId:"terraza",  name:"TERRAX",   icon:"⛏",  note:"1🌿 Mid"      },
+  { planetId:"neuronix", name:"NEURONIX", icon:"🧬", note:"1⚡ Mid"      },
+];
+
+const PERKS = {
+  permanent:[
+    { id:"p1", name:"Ajuste avanzado", emoji:"🎯", req:["neuronix"], cost:[{r:"ciencia",q:2}],    effect:"Modifica un dado siempre" },
+    { id:"p2", name:"Nave optimizada", emoji:"🛸", req:["solaris"],  cost:[{r:"propulsion",q:2}], effect:"-1 costo a tus movimientos" },
+    { id:"p3", name:"Motor eficiente", emoji:"⚙",  req:["aqua","verdia"], cost:[{r:"agua",q:2},{r:"ali",q:2}], effect:"Ignoras 1 costo de planeta" },
+    { id:"p4", name:"Dominio mineral", emoji:"⛏",  req:["terraza"], cost:[{r:"mineral",q:3}],    effect:"+1 mineral al producir" },
+    { id:"p5", name:"Reactor estable", emoji:"⚡", req:["pyron"],   cost:[{r:"ener",q:3}],        effect:"1 dado cuenta doble" },
+  ],
+  reusable:[
+    { id:"r1", name:"Ajuste tactico",    emoji:"🎲", req:["neuronix"], cost:[{r:"ciencia",q:1},{r:"ener",q:1}], effect:"Cambia un dado este turno" },
+    { id:"r2", name:"Propulsion activa", emoji:"🚀", req:["solaris"],  cost:[{r:"propulsion",q:1},{r:"ener",q:1}], effect:"+1 movimiento este turno" },
+    { id:"r3", name:"Doble extraccion",  emoji:"📦", req:["terraza"], cost:[{r:"mineral",q:2}],  effect:"Duplica produccion de un slot" },
+    { id:"r4", name:"Conversion",        emoji:"🔄", req:["voidra"],  cost:[{r:"ciencia",q:1},{r:"ener",q:1}], effect:"Cambia un recurso por otro" },
+    { id:"r5", name:"Impulso",           emoji:"⚡", req:["pyron"],   cost:[{r:"ener",q:2}],     effect:"Duplica 1 dado este turno" },
+    { id:"r6", name:"Soporte vital",     emoji:"🌿", req:["verdia"],  cost:[{r:"ali",q:1},{r:"agua",q:1}], effect:"Ignora penalizacion de recursos" },
+  ],
+  consumable:[
+    { id:"c1", name:"Impulso emergencia",emoji:"💥", cost:[{r:"ener",q:1}],    effect:"+2 Energia inmediata" },
+    { id:"c2", name:"Racion combate",    emoji:"🍖", cost:[{r:"ali",q:1}],     effect:"+2 Alimento inmediato" },
+    { id:"c3", name:"Purificacion",      emoji:"💧", cost:[{r:"agua",q:1}],    effect:"+2 Agua inmediata" },
+    { id:"c4", name:"Extraccion rapida", emoji:"⛏",  cost:[{r:"mineral",q:1}], effect:"+2 Mineral inmediato" },
+    { id:"c5", name:"Catalizador",       emoji:"🔬", cost:[{r:"ciencia",q:1},{r:"ener",q:1}], effect:"Activa efecto aleatorio" },
+  ],
+};
+
+const EXTRA_DICE = [
+  { id:"d4", name:"4to Dado", emoji:"🎲", cost:[{r:"mineral",q:3},{r:"ener",q:1},{r:"ciencia",q:1}], effect:"Agrega un 4to dado permanente" },
+  { id:"d5", name:"5to Dado", emoji:"🎲", cost:[{r:"mineral",q:4},{r:"ener",q:2},{r:"ciencia",q:1}], effect:"Agrega un 5to dado permanente" },
+  { id:"d6", name:"6to Dado", emoji:"🎲", cost:[{r:"mineral",q:5},{r:"ener",q:2},{r:"ciencia",q:2}], effect:"Agrega un 6to dado permanente" },
+];
+
+const PERK_TYPE_META = {
+  permanent: { label:"PERMANENTES",  emoji:"inf", color:"#cc66ff", rule:"Max 2 total. 1 perm/reut por turno" },
+  reusable:  { label:"REUTILIZABLES",emoji:"🔁", color:"#00c8ff", rule:"1 uso/turno cada uno. 1 perm/reut por turno" },
+  consumable:{ label:"CONSUMIBLES",  emoji:"⚡", color:"#ffcc00", rule:"Compra sin limite. Max 3 usos por turno" },
+  dice:      { label:"DADOS EXTRA",  emoji:"🎲", color:"#ff8800", rule:"Dado permanente. Sin restriccion de turno" },
+};
+
+const MAX_PERMANENT = 2;
+const TABS = [
+  { id:"board",  icon:"🗺", label:"TABLERO" },
+  { id:"market", icon:"🛒", label:"MERCADO" },
+  { id:"stats",  icon:"📊", label:"STATS"   },
+];
+
+const PLANET_POS = [
+  {left:"50%",top:"6%"},{left:"84%",top:"22%"},{left:"93%",top:"57%"},
+  {left:"72%",top:"87%"},{left:"28%",top:"87%"},{left:"7%",top:"57%"},{left:"16%",top:"22%"},
+];
+
+async function fSet(c,d){ try{ await firebase.database().ref("lobbies/"+c).set(d); return true; }catch(e){ return false; } }
+async function fGet(c){ try{ const s=await firebase.database().ref("lobbies/"+c).get(); return s.exists()?s.val():null; }catch(e){ return null; } }
+async function fUpd(c,p){ try{ await firebase.database().ref("lobbies/"+c).update(p); return true; }catch(e){ return false; } }
+function fListen(c,cb){ const r=firebase.database().ref("lobbies/"+c); r.on("value",s=>cb(s.exists()?s.val():null)); return ()=>r.off("value"); }
+function useFirebase(cb){ React.useEffect(()=>{ cb&&cb(); },[]); return true; }
+
+function genCode(){ return Math.floor(100000+Math.random()*900000).toString(); }
+
+function rgb(hex){
+  return parseInt(hex.slice(1,3),16)+","+parseInt(hex.slice(3,5),16)+","+parseInt(hex.slice(5,7),16);
+}
+function ft(s){ return Math.floor(s/60)+":"+(s%60).toString().padStart(2,"0"); }
+function initRes(){ return Object.fromEntries(RESOURCES.map(r=>[r.id,Array(7).fill(0)])); }
+function pName(id){ const p=PLANETS.find(p=>p.id===id); return p?p.label:id; }
+function canAfford(slots,cost){ return cost.every(c=>(slots[c.r]||[]).filter(v=>v===1).length>=c.q); }
+
+// Audio
+// Audio engine
+let _AC=null;
+function _ac(){ if(!_AC||_AC.state==="closed") _AC=new(window.AudioContext||window.webkitAudioContext)(); return _AC; }
+function _note(f,t,dur,vol,tp){
+  try{
+    const ac=_ac(),osc=ac.createOscillator(),gn=ac.createGain();
+    osc.connect(gn); gn.connect(ac.destination);
+    osc.type=tp||"sine"; osc.frequency.value=f;
+    const ts=ac.currentTime+t;
+    gn.gain.setValueAtTime(0,ts);
+    gn.gain.linearRampToValueAtTime(vol||0.15,ts+0.01);
+    gn.gain.exponentialRampToValueAtTime(0.001,ts+dur);
+    osc.start(ts); osc.stop(ts+dur+0.02);
+  }catch(e){}
+}
+function _drum(freq,t,dur){
+  try{
+    const ac=_ac(),buf=ac.createBuffer(1,Math.ceil(ac.sampleRate*dur),ac.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2);
+    const src=ac.createBufferSource(),gn=ac.createGain(),fl=ac.createBiquadFilter();
+    src.buffer=buf; fl.type="lowpass"; fl.frequency.value=freq||300;
+    src.connect(fl); fl.connect(gn); gn.connect(ac.destination);
+    const ts=ac.currentTime+t;
+    gn.gain.setValueAtTime(0.3,ts); gn.gain.exponentialRampToValueAtTime(0.001,ts+dur);
+    src.start(ts);
+  }catch(e){}
+}
+const SOUNDS={
+  water:()=>{ [261,311,392,261].forEach((f,i)=>_note(f,i*.08,.15,.12,"sine")); _drum(200,0,.1); },
+  nature:()=>{ [329,392,440,523].forEach((f,i)=>_note(f,i*.07,.18,.1,"triangle")); },
+  electric:()=>{ [110,220,440,880].forEach((f,i)=>_note(f,i*.04,.08,.12,"sawtooth")); },
+  rock:()=>{ _drum(60,0,.3); _note(80,"sine",0,.2,.3); },
+  science:()=>{ [523,659,784,1047,784,659].forEach((f,i)=>_note(f,i*.055,.12,.1,"sine")); },
+  propuls:()=>{ _drum(200,0,.25); [200,300,400].forEach((f,i)=>_note(f,i*.06,.1,.08,"sawtooth")); },
+  ocean:()=>{ [196,247,294,247].forEach((f,i)=>_note(f,i*.09,.2,.1,"sine")); },
+  fire:()=>{ _drum(400,0,.18); [130,110,90].forEach((f,i)=>_note(f,i*.07,.15,.1,"sawtooth")); },
+  mineral:()=>{ _drum(80,0,.2); _note(65,0,.25,.15,"sine"); },
+  forest:()=>{ [392,440,523,440].forEach((f,i)=>_note(f,i*.08,.16,.1,"triangle")); },
+  tech:()=>{ [880,1047,1319,1047,880].forEach((f,i)=>_note(f,i*.04,.07,.08,"square")); },
+  casino:()=>{ [1047,880,659,523,659,880,1047].forEach((f,i)=>_note(f,i*.05,.1,.1,"sine")); },
+  solar:()=>{ [523,659,784,880,1047].forEach((f,i)=>_note(f,i*.07,.14,.1,"sine")); },
+  buy:()=>{ [523,659,784,1047,1319].forEach((f,i)=>_note(f,i*.06,.15,.2,"sine")); _drum(200,.1,.15); },
+  poweruse:()=>{ _drum(300,0,.1); [440,554,659,880,1109].forEach((f,i)=>_note(f,i*.04,.12,.18,"sine")); },
+  newround:()=>{ _drum(150,0,.15); [392,494,587,784].forEach((f,i)=>_note(f,i*.08,.15,.18,"triangle")); },
+  victory:()=>{ [[523,0],[659,.1],[784,.2],[1047,.32],[1319,.44],[1568,.56]].forEach(([f,t])=>_note(f,t,.25,.25,"sine")); for(let i=0;i<8;i++) _note(1200+Math.random()*1600,.8+i*.05,.08,.12,"sine"); _drum(200,.05,.2); },
+  defeat:()=>{ [[494,0],[392,.15],[330,.3],[262,.45]].forEach(([f,t])=>_note(f,t,.2,.2,"sawtooth")); _drum(100,.1,.3); },
+  endgame:()=>{ [[130,0],[165,.5],[196,1],[261,1.5],[330,2],[392,2.5],[523,3]].forEach(([f,t])=>{ _note(f,t,.5,.3,"sine"); _note(f*2,t+.05,.4,.2,"sine"); }); [523,659,784,1047].forEach((f,i)=>_note(f,3.8+i*.15,.3,.2,"sine")); for(let i=0;i<12;i++) _note(1200+Math.random()*2000,4.5+i*.08,.1,.15,"sine"); },
+  click:()=>{ _note(900,0,.06,.06,"sine"); },
+  undo:()=>{ _note(400,0,.06,.05,"sine"); },
+};
+function useAudio(){
+  return function(name){ try{ if(SOUNDS[name]) SOUNDS[name](); }catch(e){} };
+}
+
+// Animations
+function NewRoundFlash(){
+  return(
+    <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:996,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <style>{"@keyframes nrBg{0%{opacity:0}15%{opacity:1}100%{opacity:0}} @keyframes nrTxt{0%{transform:scale(.6);opacity:0}20%{transform:scale(1.15);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:scale(.9) translateY(-30px);opacity:0}}"}</style>
+      <div style={{position:"absolute",inset:0,background:"rgba(0,200,255,.07)",animation:"nrBg .9s ease forwards"}}/>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:32,fontWeight:900,color:"#00c8ff",letterSpacing:8,textShadow:"0 0 40px rgba(0,200,255,1),0 0 80px rgba(0,200,255,.5)",animation:"nrTxt .9s cubic-bezier(.2,.8,.3,1) forwards"}}>NUEVA RONDA</div>
+    </div>
+  );
+}
+function Particles({type}){
+  const e=type==="victory"?["🌟","✨","🎉","💫","⭐","🏆"]:["💀","❌","💔","😭"];
+  return(
+    <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:999,overflow:"hidden"}}>
+      <style>{"@keyframes gu{to{transform:translateY(-130vh) scale(.1);opacity:0}} @keyframes gd{to{transform:translateY(90vh) scale(.2);opacity:0}} @keyframes fv{0%,100%{background:transparent}15%{background:rgba(0,255,150,.2)}} @keyframes fd{0%,100%{background:transparent}15%{background:rgba(255,30,0,.25)}}"}</style>
+      <div style={{position:"absolute",inset:0,animation:(type==="victory"?"fv":"fd")+" .6s ease forwards"}}/>
+      {Array.from({length:18},(_,i)=>(
+        <div key={i} style={{position:"absolute",left:(5+Math.random()*90)+"%",top:type==="victory"?"95%":"5%",fontSize:16+Math.random()*16,animation:(type==="victory"?"gu":"gd")+" "+(1.1+Math.random())+"s "+(Math.random()*.7)+"s ease-out forwards",opacity:0}}>
+          {e[i%e.length]}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PowerBurst(){
+  const sparks=["⚡","✨","💫","🌟","⭐"];
+  return(
+    <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:998,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <style>{"@keyframes pbR{0%{transform:scale(0);opacity:.9}100%{transform:scale(4);opacity:0}} @keyframes pbF{0%,100%{background:transparent}15%{background:rgba(255,204,0,.18)}}"}</style>
+      <div style={{position:"absolute",inset:0,animation:"pbF .7s ease forwards"}}/>
+      <div style={{width:80,height:80,borderRadius:"50%",border:"3px solid rgba(255,200,0,.8)",position:"absolute",animation:"pbR .7s ease forwards"}}/>
+      {Array.from({length:8},(_,i)=>{
+        const a=(i/8)*Math.PI*2,dist=55+Math.random()*35;
+        const dx=Math.cos(a)*dist,dy=Math.sin(a)*dist;
+        return(
+          <div key={i} style={{position:"absolute",fontSize:16,transform:"translate("+dx+"px,"+dy+"px) scale(0)",animation:"pbR .6s "+(i*.05)+"s ease forwards",opacity:0}}>
+            {sparks[i%5]}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BuyBurst(){
+  const items=["🛒","⭐","💎","✨","🌟","💫"];
+  return(
+    <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:997,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <style>{"@keyframes bbR{0%{transform:translate(-50%,-50%) scale(0);opacity:.8}100%{transform:translate(-50%,-50%) scale(5);opacity:0}} @keyframes bbF{0%,100%{background:transparent}10%{background:rgba(0,200,255,.15)}}"}</style>
+      <div style={{position:"absolute",inset:0,animation:"bbF .8s ease forwards"}}/>
+      <div style={{position:"absolute",top:"50%",left:"50%",width:60,height:60,borderRadius:"50%",border:"2px solid rgba(204,102,255,.7)",animation:"bbR .8s ease forwards"}}/>
+      {Array.from({length:8},(_,i)=>{
+        const a=(i/8)*Math.PI*2,dist=50+Math.random()*50;
+        const dx=Math.cos(a)*dist,dy=Math.sin(a)*dist;
+        return(
+          <div key={i} style={{position:"absolute",fontSize:18,top:"50%",left:"50%",transform:"translate("+dx+"px,"+dy+"px) scale(0)",animation:"bbR .8s "+(i*.06)+"s ease-out forwards",opacity:0,marginTop:-12,marginLeft:-12}}>
+            {items[i%6]}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Resource Row
+function ResourceRow({res,slots,onToggle}){
+  const gained=slots.filter(v=>v===1).length;
+  return(
+    <div style={{marginBottom:10,padding:"8px 10px",borderRadius:9,border:"1px solid rgba("+res.rgb+",.18)",background:"rgba("+res.rgb+",.05)"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+        <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,border:"1.5px solid "+res.color,background:"rgba("+res.rgb+",.1)"}}>{res.icon}</div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:7,letterSpacing:1,color:"rgba(200,232,255,.6)",flex:1}}>{res.label}</div>
+        <span style={{fontFamily:"Orbitron,monospace",fontSize:11,fontWeight:700,color:gained>0?res.color:"#3a6080"}}>{gained}</span>
+      </div>
+      <div style={{display:"flex",gap:3}}>
+        {slots.map((state,i)=>(
+          <div key={i} onClick={()=>onToggle(i)} style={{flex:1,height:24,borderRadius:4,cursor:"pointer",border:state===1?"1.5px solid rgba(0,210,110,.7)":"1.5px solid rgba("+res.rgb+",.18)",background:state===1?"rgba(0,210,110,.18)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .12s",userSelect:"none",WebkitTapHighlightColor:"transparent",fontSize:11}}>
+            {state===1&&<span style={{lineHeight:1}}>{res.icon}</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Cost Badge
+function CostBadge({cost}){
+  return(
+    <div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:5}}>
+      {cost.map((c,i)=>{
+        const res=RESOURCES.find(r=>r.id===c.r);
+        return res?(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:2,padding:"2px 6px",borderRadius:4,border:"1px solid rgba("+res.rgb+",.4)",background:"rgba("+res.rgb+",.1)"}}>
+            <span style={{fontSize:10}}>{res.icon}</span>
+            <span style={{fontFamily:"Orbitron,monospace",fontSize:7,color:res.color,fontWeight:700}}>x{c.q}</span>
+          </div>
+        ):null;
+      })}
+    </div>
+  );
+}
+
+// Req Badge
+function ReqBadge({req}){
+  if(!req||req.length===0) return null;
+  return(
+    <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:4}}>
+      {req.map(pid=>{
+        const p=PLANETS.find(pl=>pl.id===pid);
+        return p?<div key={pid} style={{display:"flex",alignItems:"center",gap:2,padding:"2px 5px",borderRadius:4,border:"1px solid rgba("+rgb(p.color)+",.35)",background:"rgba("+rgb(p.color)+",.08)"}}><span style={{fontSize:9}}>{p.icon}</span><span style={{fontFamily:"Orbitron,monospace",fontSize:6,color:p.color}}>{p.label}</span></div>:null;
+      })}
+    </div>
+  );
+}
+
+// Active Perks
+function ActivePerks({ownedPerks,onUsePerk,consumablesUsedThisTurn,extraDice}){
+  const hasAny=ownedPerks.length>0||(extraDice&&extraDice.length>0);
+  if(!hasAny) return(
+    <div style={{padding:"10px 12px",borderRadius:9,border:"1px dashed #1a3a55",textAlign:"center"}}>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:4}}>PERKS ACTIVOS</div>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#1a4a6a"}}>Sin perks. Visita el Mercado</div>
+    </div>
+  );
+  const perm=ownedPerks.filter(p=>p.type==="permanent");
+  const reut=ownedPerks.filter(p=>p.type==="reusable");
+  const cons=ownedPerks.filter(p=>p.type==="consumable");
+  const consMap=cons.reduce((a,p)=>{ if(!a[p.id]) a[p.id]={...p,count:0}; a[p.id].count++; return a; },{});
+  return(
+    <div>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:10}}>PERKS ACTIVOS</div>
+      {extraDice&&extraDice.length>0&&(
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:8,border:"1.5px solid rgba(255,136,0,.35)",background:"rgba(255,136,0,.07)",marginBottom:10}}>
+          <span style={{fontSize:22}}>🎲</span>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:8,fontWeight:700,color:"#ff8800"}}>+{extraDice.length} DADO{extraDice.length>1?"S":""} EXTRA</div>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#3a6080"}}>{3+extraDice.length} dados totales</div>
+          </div>
+        </div>
+      )}
+      {perm.map((p,i)=>(
+        <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,border:"1px solid rgba(204,102,255,.25)",background:"rgba(204,102,255,.06)",marginBottom:5}}>
+          <span style={{fontSize:20}}>{p.emoji}</span>
+          <div style={{flex:1}}>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:8,fontWeight:700,color:"#cc66ff"}}>{p.name}</div>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#3a6080"}}>{p.effect}</div>
+          </div>
+          <div style={{padding:"4px 8px",borderRadius:6,border:"1px solid rgba(204,102,255,.3)",fontFamily:"Orbitron,monospace",fontSize:7,color:"#cc66ff"}}>ACTIVO</div>
+        </div>
+      ))}
+      {reut.map((p,i)=>{
+        const used=p.usedThisTurn;
+        return(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,border:"1px solid rgba(0,200,255,.25)",background:"rgba(0,200,255,.06)",marginBottom:5}}>
+            <span style={{fontSize:20}}>{p.emoji}</span>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:8,fontWeight:700,color:"#00c8ff"}}>{p.name}</div>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#3a6080"}}>{p.effect}</div>
+            </div>
+            <button onClick={()=>!used&&onUsePerk(p.id,"reusable")} style={{padding:"6px 10px",borderRadius:7,border:"1.5px solid "+(used?"#1a3a55":"rgba(0,200,255,.5)"),background:used?"transparent":"rgba(0,200,255,.1)",fontFamily:"Orbitron,monospace",fontSize:7,color:used?"#2a4060":"#00c8ff",cursor:used?"default":"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+              {used?"USADO":"USAR"}
+            </button>
+          </div>
+        );
+      })}
+      {Object.values(consMap).map((p,i)=>{
+        const canUse=consumablesUsedThisTurn<3;
+        return(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,border:"1px solid rgba(255,204,0,.25)",background:"rgba(255,204,0,.06)",marginBottom:5}}>
+            <span style={{fontSize:20}}>{p.emoji}</span>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:8,fontWeight:700,color:"#ffcc00"}}>{p.name}</div>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#3a6080"}}>{p.effect}</div>
+            </div>
+            <button onClick={()=>canUse&&onUsePerk(p.id,"consumable")} style={{padding:"6px 10px",borderRadius:7,border:"1.5px solid "+(canUse?"rgba(255,204,0,.5)":"#1a3a55"),background:canUse?"rgba(255,204,0,.1)":"transparent",fontFamily:"Orbitron,monospace",fontSize:7,color:canUse?"#ffcc00":"#2a4060",cursor:canUse?"pointer":"default",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+              {canUse?"x"+p.count:"3/3"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Planet Section
+function PlanetSection({sequence,unlocked,onOrbitTap,onSeqRemove,shaking}){
+  return(
+    <>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:4}}>SISTEMA ESTELAR</div>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#1a4a6a",marginBottom:10}}>TAP = AGREGAR A SECUENCIA</div>
+      <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
+        <div style={{position:"relative",width:"100%",maxWidth:290,aspectRatio:"1/1"}}>
+          <style>{"@keyframes shake{0%,100%{transform:translateX(0)}10%,50%,90%{transform:translateX(-6px)}30%,70%{transform:translateX(6px)}}"}</style>
+          <div style={{position:"absolute",inset:0,borderRadius:"50%",border:"1px dashed rgba(0,200,255,.13)",animation:shaking?"shake .55s ease":"none"}}/>
+          <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:34,height:34,borderRadius:"50%",background:"radial-gradient(circle,#fff8c0,#ffcc00 40%,#ff8800 80%,transparent)",boxShadow:"0 0 18px rgba(255,200,0,.7)"}}/>
+          {PLANETS.map((planet,i)=>{
+            const inSeq=sequence.includes(planet.id);
+            const isUnlocked=unlocked.includes(planet.id);
+            const tappable=!inSeq&&sequence.length<PLANETS.length;
+            return(
+              <div key={planet.id} onClick={()=>tappable&&onOrbitTap(planet.id)}
+                style={{position:"absolute",left:PLANET_POS[i].left,top:PLANET_POS[i].top,transform:"translate(-50%,-50%)",width:48,height:48,cursor:tappable?"pointer":"default",WebkitTapHighlightColor:"transparent",opacity:inSeq?0.3:1}}>
+                <div style={{width:"100%",height:"100%",borderRadius:"50%",border:"2px solid "+planet.color,background:inSeq?"rgba("+rgb(planet.color)+",.03)":"rgba("+rgb(planet.color)+",.1)",boxShadow:inSeq?"none":isUnlocked?"0 0 14px rgba("+rgb(planet.color)+",.55)":"0 0 8px rgba("+rgb(planet.color)+",.25)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative"}}>
+                  {isUnlocked&&!inSeq&&<div style={{position:"absolute",top:-3,right:-3,width:13,height:13,borderRadius:"50%",background:"#00ff9d",border:"1.5px solid #060c14",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,color:"#060c14",fontWeight:900}}>v</div>}
+                  <div style={{fontSize:15,lineHeight:1}}>{planet.icon}</div>
+                  <div style={{fontFamily:"Orbitron,monospace",fontSize:4.5,color:planet.color,marginTop:2}}>{planet.label}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{marginBottom:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080"}}>SECUENCIA</div>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:sequence.length===PLANETS.length?"#00ff9d":"#3a6080"}}>{sequence.length}/{PLANETS.length}</div>
+        </div>
+        <div style={{display:"flex",gap:4}}>
+          {Array.from({length:PLANETS.length},(_,i)=>{
+            const pid=sequence[i];
+            const planet=pid?PLANETS.find(p=>p.id===pid):null;
+            return(
+              <div key={i} onClick={()=>pid&&onSeqRemove(pid)}
+                style={{flex:1,height:32,borderRadius:6,border:planet?"1.5px solid "+planet.color:"1px dashed #1a3a55",background:planet?"rgba("+rgb(planet.color)+",.12)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",cursor:planet?"pointer":"default",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+                {planet&&<span style={{fontSize:14}}>{planet.icon}</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+        {PLANETS.map(planet=>{
+          const u=unlocked.includes(planet.id);
+          return(
+            <div key={planet.id} style={{flex:"1 0 calc(14% - 5px)",minWidth:42,height:54,borderRadius:9,border:"1.5px solid "+(u?planet.color:"#1a3a55"),background:u?"rgba("+rgb(planet.color)+",.12)":"rgba(255,255,255,.02)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,opacity:u?1:.32}}>
+              <div style={{fontSize:18,lineHeight:1}}>{planet.icon}</div>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:5,color:u?planet.color:"#3a6080",textAlign:"center"}}>{planet.label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+// Market Tab
+function MarketTab({resSlots,unlocked,ownedPerks,boughtNC,consumablesUsed,onBuy,onUsePerk,extraDice}){
+  const [activeType,setActiveType]=useState("permanent");
+  const meta=PERK_TYPE_META[activeType];
+  const perks=activeType==="dice"?null:PERKS[activeType];
+  const permCount=ownedPerks.filter(p=>p.type==="permanent").length;
+  return(
+    <div>
+      <div style={{padding:"8px 10px",borderRadius:8,border:"1px solid #1a3a55",background:"rgba(0,0,0,.2)",marginBottom:12}}>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080",letterSpacing:1,marginBottom:4}}>REGLAS DEL MERCADO</div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#c8e8ff",lineHeight:1.9}}>
+          Comprar por turno:{"\n"}
+          1 permanente O 1 reutilizable{"\n"}
+          Consumibles sin limite{"\n"}
+          Usar por turno:{"\n"}
+          Todos tus permanentes (pasivos){"\n"}
+          Cada reutilizable 1 vez{"\n"}
+          Hasta 3 consumibles
+        </div>
+      </div>
+      <div style={{display:"flex",gap:5,marginBottom:14}}>
+        {Object.entries(PERK_TYPE_META).map(([type,m])=>(
+          <div key={type} onClick={()=>setActiveType(type)} style={{flex:1,padding:"7px 4px",borderRadius:8,textAlign:"center",border:"1.5px solid "+(activeType===type?m.color:"#1a3a55"),background:activeType===type?"rgba("+rgb(m.color)+",.1)":"transparent",cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+            <div style={{fontSize:16,lineHeight:1,marginBottom:2}}>{m.emoji}</div>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:activeType===type?m.color:"#3a6080"}}>{m.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#3a6080",marginBottom:10}}>{meta.rule}</div>
+      {perks&&perks.map(perk=>{
+        const owned=ownedPerks.some(p=>p.id===perk.id);
+        const isCons=activeType==="consumable";
+        const ownedCnt=ownedPerks.filter(p=>p.id===perk.id).length;
+        const canBuyMore=isCons||!owned;
+        const affordable=canAfford(resSlots,perk.cost);
+        const reqMet=!perk.req||perk.req.every(r=>unlocked.includes(r));
+        const permFull=activeType==="permanent"&&permCount>=MAX_PERMANENT&&!owned;
+        const blockNC=boughtNC>0&&activeType!=="consumable";
+        const canBuy=canBuyMore&&affordable&&reqMet&&!permFull&&!blockNC;
+        const usedThisTurn=ownedPerks.filter(p=>p.id===perk.id&&p.usedThisTurn).length>0;
+        const canUse=owned&&!isCons&&(activeType==="permanent"||!usedThisTurn);
+        return(
+          <div key={perk.id} style={{marginBottom:10,padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(owned?meta.color:reqMet&&affordable?"#1a3a55":"#0e2030"),background:owned?"rgba("+rgb(meta.color)+",.07)":"rgba(255,255,255,.02)",opacity:reqMet?1:.6}}>
+            <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+              <div style={{fontSize:26,flexShrink:0}}>{perk.emoji}</div>
+              <div style={{flex:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                  <span style={{fontFamily:"Orbitron,monospace",fontSize:9,fontWeight:700,color:owned?meta.color:"#c8e8ff"}}>{perk.name}</span>
+                  {owned&&<span style={{fontFamily:"Orbitron,monospace",fontSize:7,color:meta.color,border:"1px solid "+meta.color,padding:"1px 4px",borderRadius:3}}>{isCons?"x"+ownedCnt:"ok"}</span>}
+                </div>
+                <div style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080",lineHeight:1.5,marginBottom:4}}>{perk.effect}</div>
+                {perk.req&&perk.req.length>0&&<><div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:"#3a6080",marginBottom:2}}>REQUIERE:</div><ReqBadge req={perk.req}/></>}
+                <CostBadge cost={perk.cost}/>
+                {!reqMet&&<div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#ff4444",marginTop:5}}>Necesitas desbloquear planetas requeridos</div>}
+                {permFull&&<div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#ff4444",marginTop:5}}>Ya tienes 2 permanentes</div>}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,marginTop:10}}>
+              {canBuyMore&&<button onClick={()=>canBuy&&onBuy(perk,activeType)} style={{flex:1,padding:"8px",borderRadius:7,border:"1.5px solid "+(canBuy?"rgba(0,200,255,.5)":"#1a3a55"),background:canBuy?"rgba(0,200,255,.1)":"transparent",fontFamily:"Orbitron,monospace",fontSize:8,color:canBuy?"#00c8ff":"#2a4060",cursor:canBuy?"pointer":"default",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+                🛒 {isCons?"COMPRAR":"ADQUIRIR"}
+              </button>}
+              {owned&&activeType!=="permanent"&&<button onClick={()=>canUse&&onUsePerk(perk.id,activeType)} style={{flex:1,padding:"8px",borderRadius:7,border:"1.5px solid "+(canUse?"rgba(0,255,150,.5)":"#1a3a55"),background:canUse?"rgba(0,255,150,.08)":"transparent",fontFamily:"Orbitron,monospace",fontSize:8,color:canUse?"#00ff9d":"#2a4060",cursor:canUse?"pointer":"default",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+                {activeType==="reusable"?(usedThisTurn?"USADO":"USAR"):"USAR"}
+              </button>}
+              {activeType==="permanent"&&owned&&<div style={{flex:1,padding:"8px",borderRadius:7,border:"1.5px solid rgba(204,102,255,.3)",background:"rgba(204,102,255,.06)",fontFamily:"Orbitron,monospace",fontSize:8,color:"#cc66ff",textAlign:"center"}}>ACTIVO</div>}
+            </div>
+          </div>
+        );
+      })}
+      {activeType==="dice"&&EXTRA_DICE.map(dice=>{
+        const owned=extraDice.includes(dice.id);
+        const affordable=canAfford(resSlots,dice.cost);
+        const canBuy=!owned&&affordable&&boughtNC===0;
+        return(
+          <div key={dice.id} style={{marginBottom:10,padding:"10px 12px",borderRadius:10,border:"1.5px solid "+(owned?"#ff8800":"#1a3a55"),background:owned?"rgba(255,136,0,.07)":"rgba(255,255,255,.02)"}}>
+            <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+              <span style={{fontSize:28}}>{dice.emoji}</span>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:"Orbitron,monospace",fontSize:9,fontWeight:700,color:owned?"#ff8800":"#c8e8ff",marginBottom:2}}>{dice.name} {owned&&<span style={{fontSize:7,color:"#ff8800",border:"1px solid #ff8800",padding:"1px 4px",borderRadius:3}}>ACTIVO</span>}</div>
+                <div style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080",marginBottom:4}}>{dice.effect}</div>
+                <CostBadge cost={dice.cost}/>
+              </div>
+            </div>
+            <button onClick={()=>canBuy&&onBuy(dice,"dice")} style={{width:"100%",padding:"8px",borderRadius:7,marginTop:10,border:"1.5px solid "+(canBuy?"rgba(255,136,0,.6)":"#1a3a55"),background:canBuy?"rgba(255,136,0,.1)":"transparent",fontFamily:"Orbitron,monospace",fontSize:8,color:canBuy?"#ff8800":"#2a4060",cursor:canBuy?"pointer":"default",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+              {owned?"DADO ACTIVO":"ADQUIRIR DADO"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Stats Screen
+function StatsScreen({roundHistory,gStats,timer,seqHistory,unlocked,ownedPerks,extraDice,player,onShare,currentRound}){
+  const pRgb=rgb(player.color.hex);
+  const totG=Object.fromEntries(RESOURCES.map(r=>[r.id,roundHistory.reduce((a,rnd)=>a+(rnd.gained[r.id]||0),0)]));
+  const totS=Object.fromEntries(RESOURCES.map(r=>[r.id,roundHistory.reduce((a,rnd)=>a+(rnd.spent[r.id]||0),0)]));
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{background:"rgba(255,255,255,.02)",border:"1px solid #1a3a55",borderRadius:10,padding:"14px 12px"}}>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:12}}>RESUMEN</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+          {[
+            {icon:"⏱",val:ft(timer),label:"TIEMPO"},
+            {icon:"🔄",val:currentRound,label:"RONDAS"},
+            {icon:"💀",val:gStats.seqLost,label:"SEQ PERDIDAS"},
+            {icon:"🔓",val:unlocked.length,label:"DESBLOQUEOS"},
+            {icon:"🛒",val:ownedPerks.length,label:"PERKS"},
+            {icon:"🎲",val:3+(extraDice||[]).length,label:"DADOS"},
+          ].map(s=>(
+            <div key={s.label} style={{padding:"10px 6px",borderRadius:9,border:"1px solid rgba("+pRgb+",.2)",background:"rgba("+pRgb+",.06)",textAlign:"center"}}>
+              <div style={{fontSize:18,marginBottom:3}}>{s.icon}</div>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:14,fontWeight:900,color:player.color.hex,lineHeight:1}}>{s.val}</div>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:5.5,color:"#3a6080",marginTop:3}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {(gStats.marketBuys||[]).length>0&&(
+        <div style={{background:"rgba(255,255,255,.02)",border:"1px solid #1a3a55",borderRadius:10,padding:"14px 12px"}}>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:10}}>HISTORIAL COMPRAS</div>
+          {gStats.marketBuys.map((b,i)=>{
+            const tc=b.type==="permanent"?"#cc66ff":b.type==="reusable"?"#00c8ff":b.type==="dice"?"#ff8800":"#ffcc00";
+            return(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 8px",borderRadius:6,border:"1px solid rgba("+rgb(tc)+",.2)",background:"rgba("+rgb(tc)+",.05)",marginBottom:4}}>
+                <span style={{fontSize:14}}>{b.emoji}</span>
+                <span style={{fontFamily:"Orbitron,monospace",fontSize:7,color:tc,flex:1}}>{b.name}</span>
+                <span style={{fontFamily:"Orbitron,monospace",fontSize:6,color:"#3a6080"}}>R{b.round}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {roundHistory.length>0&&(
+        <div style={{background:"rgba(255,255,255,.02)",border:"1px solid #1a3a55",borderRadius:10,padding:"14px 12px"}}>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:10}}>POR RONDA</div>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr><th style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080",textAlign:"left",width:22}}/>{roundHistory.map((_,i)=><th key={i} style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080",textAlign:"center",minWidth:24}}>R{i+1}</th>)}</tr></thead>
+              <tbody>{RESOURCES.map(r=>(
+                <tr key={r.id}><td style={{fontSize:13,paddingBottom:3}}>{r.icon}</td>
+                {roundHistory.map((rnd,i)=><td key={i} style={{textAlign:"center",paddingBottom:3}}>
+                  <div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:"#00cc77"}}>+{rnd.gained[r.id]||0}</div>
+                  <div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:"#ff5555"}}>-{rnd.spent[r.id]||0}</div>
+                </td>)}
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      <button onClick={onShare} style={{padding:"13px",borderRadius:10,border:"1.5px solid "+player.color.hex,background:"rgba("+pRgb+",.12)",fontFamily:"Orbitron,monospace",fontSize:10,letterSpacing:3,color:player.color.hex,cursor:"pointer",fontWeight:700}}>
+        COMPARTIR REPORTE
+      </button>
+    </div>
+  );
+}
+
+// End Stats Overlay
+function EndStatsOverlay({player,roundHistory,gStats,timer,seqHistory,unlocked,ownedPerks,extraDice,onClose}){
+  const pRgb=rgb(player.color.hex);
+  const totG=Object.fromEntries(RESOURCES.map(r=>[r.id,roundHistory.reduce((a,rnd)=>a+(rnd.gained[r.id]||0),0)]));
+  const totS=Object.fromEntries(RESOURCES.map(r=>[r.id,roundHistory.reduce((a,rnd)=>a+(rnd.spent[r.id]||0),0)]));
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:2000,background:"rgba(6,12,20,.97)",overflowY:"auto",fontFamily:"'Exo 2',sans-serif",color:"#c8e8ff"}}>
+      <style>{"@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap'); *{box-sizing:border-box} @keyframes shi{0%,100%{opacity:.6}50%{opacity:1}}"}</style>
+      <div style={{maxWidth:440,margin:"0 auto",padding:"28px 16px 48px"}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{fontSize:54,marginBottom:8,animation:"shi 2s ease infinite"}}>{player.ship}</div>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:10,letterSpacing:4,color:"#3a6080",marginBottom:4}}>MISION COMPLETADA</div>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:22,fontWeight:900,color:player.color.hex,textShadow:"0 0 20px rgba("+pRgb+",.7)"}}>{player.name}</div>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:"#3a6080",marginTop:4}}>{ft(timer)} - {roundHistory.length||1} RONDAS</div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:20}}>
+          {[
+            {icon:"⏱",val:ft(timer),label:"TIEMPO"},
+            {icon:"💀",val:gStats.seqLost,label:"SEQ PERDIDAS"},
+            {icon:"🔓",val:unlocked.length,label:"DESBLOQUEADOS"},
+            {icon:"🎲",val:3+(extraDice||[]).length,label:"DADOS"},
+            {icon:"🛒",val:(gStats.marketBuys||[]).length,label:"PERKS"},
+            {icon:"⚡",val:gStats.consumablesUsed||0,label:"CONSUMIBLES"},
+          ].map(s=>(
+            <div key={s.label} style={{padding:"10px 6px",borderRadius:9,border:"1px solid rgba("+pRgb+",.2)",background:"rgba("+pRgb+",.06)",textAlign:"center"}}>
+              <div style={{fontSize:18,marginBottom:3}}>{s.icon}</div>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:15,fontWeight:900,color:player.color.hex,lineHeight:1}}>{s.val}</div>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:5.5,color:"#3a6080",marginTop:3}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{background:"rgba(255,255,255,.02)",border:"1px solid #1a3a55",borderRadius:10,padding:"14px 12px",marginBottom:14}}>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:10}}>RECURSOS FINALES</div>
+          {RESOURCES.map(r=>{
+            const g=totG[r.id],s=totS[r.id],net=g-s;
+            return(
+              <div key={r.id} style={{marginBottom:7}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:2}}>
+                  <div style={{display:"flex",gap:5,alignItems:"center"}}><span style={{fontSize:13}}>{r.icon}</span><span style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"rgba(200,232,255,.6)"}}>{r.label}</span></div>
+                  <div style={{display:"flex",gap:7}}>
+                    <span style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#00cc77"}}>+{g}</span>
+                    <span style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#ff5555"}}>-{s}</span>
+                    <span style={{fontFamily:"Orbitron,monospace",fontSize:8,fontWeight:700,color:net>=0?r.color:"#ff4444"}}>={net}</span>
+                  </div>
+                </div>
+                <div style={{height:3,borderRadius:2,background:"#0a1520",overflow:"hidden"}}>
+                  <div style={{height:"100%",width:(g/Math.max(g,1)*100)+"%",borderRadius:2,background:"rgba("+r.rgb+",.5)"}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button onClick={onClose} style={{width:"100%",padding:"16px",borderRadius:12,border:"2px solid "+player.color.hex,background:"rgba("+pRgb+",.15)",fontFamily:"Orbitron,monospace",fontSize:11,letterSpacing:3,color:player.color.hex,cursor:"pointer",fontWeight:900,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+          NUEVA PARTIDA
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Setup Screen
+function SetupScreen({onStart,play}){
+  const [name,setName]=useState("");
+  const [color,setColor]=useState(PLAYER_COLORS[0]);
+  const [ship,setShip]=useState(SHIP_ICONS[0]);
+  return(
+    <div style={{minHeight:"100dvh",background:"#060c14",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 18px",fontFamily:"'Exo 2',sans-serif"}}>
+      <style>{"@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap'); *{box-sizing:border-box} body{margin:0;background:#060c14}"}</style>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:22,fontWeight:900,color:"#00c8ff",letterSpacing:3,marginBottom:4,textShadow:"0 0 20px rgba(0,200,255,.5)"}}>STELLAR</div>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:9,letterSpacing:6,color:"#3a6080",marginBottom:28}}>EXPLORER</div>
+      <div style={{width:"100%",maxWidth:360,background:"rgba(255,255,255,.02)",border:"1px solid #1a3a55",borderRadius:14,padding:"22px 18px"}}>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:8}}>NOMBRE DEL CAPITAN</div>
+        <input value={name} onChange={e=>setName(e.target.value)} maxLength={16} placeholder="Tu nombre..."
+          style={{width:"100%",padding:"12px 14px",borderRadius:9,border:"1.5px solid "+(name?"#00c8ff":"#1a3a55"),background:"rgba(0,0,0,.4)",color:"#c8e8ff",fontFamily:"Orbitron,monospace",fontSize:13,outline:"none",marginBottom:18}}/>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:8}}>COLOR DE NAVE</div>
+        <div style={{display:"flex",gap:10,marginBottom:18,justifyContent:"center"}}>
+          {PLAYER_COLORS.map(c=>(
+            <div key={c.id} onClick={()=>setColor(c)} style={{width:36,height:36,borderRadius:"50%",background:c.hex,border:color.id===c.id?"3px solid #fff":"3px solid transparent",cursor:"pointer",boxShadow:color.id===c.id?"0 0 12px "+c.hex:"none",userSelect:"none",WebkitTapHighlightColor:"transparent"}}/>
+          ))}
+        </div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:8}}>ICONO DE NAVE</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:22,justifyContent:"center"}}>
+          {SHIP_ICONS.map((ic,i)=>(
+            <div key={i} onClick={()=>{setShip(ic);play("click");}} style={{width:42,height:42,borderRadius:9,border:"1.5px solid "+(ship===ic?color.hex:"#1a3a55"),background:ship===ic?"rgba("+rgb(color.hex)+",.12)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+              {ic}
+            </div>
+          ))}
+        </div>
+        <button disabled={!name.trim()} onClick={()=>name.trim()&&onStart({name:name.trim(),color,ship})}
+          style={{width:"100%",padding:"14px",borderRadius:10,border:"2px solid "+(name?"#00c8ff":"#1a3a55"),background:name?"rgba(0,200,255,.12)":"transparent",fontFamily:"Orbitron,monospace",fontSize:12,letterSpacing:3,color:name?"#00c8ff":"#2a4060",cursor:name?"pointer":"default",fontWeight:900,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+          CONTINUAR
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Lobby Menu
+function LobbyMenu({onCreate,onJoin,onSolo}){
+  return(
+    <div style={{minHeight:"100dvh",background:"#060c14",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 18px",fontFamily:"'Exo 2',sans-serif"}}>
+      <style>{"@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap'); *{box-sizing:border-box} body{margin:0;background:#060c14} @keyframes gl{0%,100%{text-shadow:0 0 20px rgba(0,200,255,.5)}50%{text-shadow:0 0 40px rgba(0,200,255,.9)}}"}</style>
+      <div style={{textAlign:"center",marginBottom:44}}>
+        <div style={{fontSize:56,marginBottom:8}}>🌌</div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:26,fontWeight:900,color:"#00c8ff",letterSpacing:3,animation:"gl 2.5s ease infinite"}}>STELLAR</div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:11,letterSpacing:7,color:"#3a6080",marginTop:2}}>EXPLORER</div>
+      </div>
+      <div style={{width:"100%",maxWidth:320,display:"flex",flexDirection:"column",gap:14}}>
+        <button onClick={onCreate} style={{padding:"20px",borderRadius:12,border:"2px solid #00c8ff",background:"rgba(0,200,255,.1)",fontFamily:"Orbitron,monospace",fontSize:13,letterSpacing:3,color:"#00c8ff",cursor:"pointer",fontWeight:900,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+          CREAR PARTIDA
+        </button>
+        <button onClick={onJoin} style={{padding:"20px",borderRadius:12,border:"2px solid #cc66ff",background:"rgba(204,102,255,.08)",fontFamily:"Orbitron,monospace",fontSize:13,letterSpacing:3,color:"#cc66ff",cursor:"pointer",fontWeight:900,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+          UNIRSE A PARTIDA
+        </button>
+        <button onClick={onSolo} style={{padding:"16px",borderRadius:12,border:"1.5px solid #3a6080",background:"rgba(255,255,255,.03)",fontFamily:"Orbitron,monospace",fontSize:11,letterSpacing:3,color:"#3a6080",cursor:"pointer",fontWeight:700,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+          JUEGO RAPIDO
+        </button>
+      </div>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#1a3a55",letterSpacing:2,marginTop:30,textAlign:"center",lineHeight:2}}>CADA JUGADOR USA SU PROPIO CELULAR</div>
+    </div>
+  );
+}
+
+// Create Lobby
+function CreateLobby({player,onBack,onGameStart,play}){
+  const [code]=useState(()=>genCode());
+  const [lobby,setLobby]=useState(null);
+  const [starting,setStarting]=useState(false);
+  const [fbReady,setFbReady]=useState(true);
+  const unsub=useRef(null);
+  const pRgb=rgb(player.color.hex);
+  useFirebase(()=>setFbReady(true));
+  useEffect(()=>{
+    if(!fbReady) return;
+    const data={code,status:"waiting",round:1,startTime:null,players:[{name:player.name,color:player.color,ship:player.ship,pos:0,joined:Date.now()}]};
+    fSet(code,data).then(()=>setLobby(data));
+    unsub.current=fListen(code,d=>{ if(d) setLobby(d); });
+    return()=>{ if(unsub.current) unsub.current(); };
+  },[fbReady]);
+  const handleStart=async()=>{
+    if(!lobby) return;
+    setStarting(true); play("newround");
+    const lobbyPlayers=lobby.players||[];
+    // Ensure host is always in players list
+    const players=lobbyPlayers.length>0?lobbyPlayers:[{name:player.name,color:player.color,ship:player.ship,pos:0,joined:Date.now()}];
+    const withPos=players.map((p,i)=>({...p,pos:i,planetName:i<PLANET_START_ORDER.length?PLANET_START_ORDER[i].name:"VERDIA",planetId:i<PLANET_START_ORDER.length?PLANET_START_ORDER[i].planetId:"verdia"}));
+    const updated={...lobby,status:"started",startTime:Date.now(),players:withPos};
+    await fSet(code,updated);
+    const me=withPos[0];
+    onGameStart({code,lobby:updated,myPlanetId:me.planetId,myPlanet:me.planetName,isHost:true});
+  };
+  const players=lobby?lobby.players:[];
+  return(
+    <div style={{minHeight:"100dvh",background:"#060c14",fontFamily:"'Exo 2',sans-serif",color:"#c8e8ff",padding:"20px 16px 40px",maxWidth:440,margin:"0 auto"}}>
+      <style>{"@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap'); *{box-sizing:border-box} body{margin:0;background:#060c14} @keyframes pu{0%,100%{opacity:.5}50%{opacity:1}}"}</style>
+      <button onClick={async()=>{ try{ await window.storage.delete(LOBBY_KEY+code,true); }catch(e){} onBack(); }} style={{background:"transparent",border:"none",color:"#3a6080",fontFamily:"Orbitron,monospace",fontSize:8,cursor:"pointer",marginBottom:16,padding:0}}>← VOLVER</button>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:9,letterSpacing:3,color:"#3a6080",marginBottom:4}}>CREAR PARTIDA</div>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:18,fontWeight:900,color:player.color.hex,marginBottom:20}}>{player.ship} {player.name}</div>
+      <div style={{textAlign:"center",padding:"20px 16px",borderRadius:14,border:"2px solid rgba("+pRgb+",.4)",background:"rgba("+pRgb+",.06)",marginBottom:20}}>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:"#3a6080",letterSpacing:3,marginBottom:8}}>CODIGO DE PARTIDA</div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:44,fontWeight:900,color:player.color.hex,letterSpacing:10,lineHeight:1}}>{code}</div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080",marginTop:8,letterSpacing:2}}>Comparte con los demas jugadores</div>
+      </div>
+      {!fbReady&&<div style={{textAlign:"center",fontFamily:"Orbitron,monospace",fontSize:8,color:"#3a6080",animation:"pu 1.2s ease infinite",marginBottom:12}}>CONECTANDO...</div>}
+      <div style={{background:"rgba(255,255,255,.02)",border:"1px solid #1a3a55",borderRadius:10,padding:"14px 12px",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080"}}>JUGADORES</div>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:player.color.hex}}>{players.length}</div>
+        </div>
+        {players.map((p,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,border:"1px solid rgba("+rgb(p.color?p.color.hex:"#00c8ff")+",.25)",background:"rgba("+rgb(p.color?p.color.hex:"#00c8ff")+",.06)",marginBottom:5}}>
+            <span style={{fontSize:22}}>{p.ship}</span>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:10,fontWeight:700,color:p.color?p.color.hex:"#00c8ff"}}>{p.name}</div>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:"#3a6080",marginTop:2}}>J{i+1} - {i<PLANET_START_ORDER.length?PLANET_START_ORDER[i].name+" ("+PLANET_START_ORDER[i].note+")":"Extra"}</div>
+            </div>
+            {i===0&&<div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:player.color.hex,border:"1px solid "+player.color.hex,padding:"2px 5px",borderRadius:3}}>HOST</div>}
+            <div style={{width:8,height:8,borderRadius:"50%",background:"#00ff9d"}}/>
+          </div>
+        ))}
+        {players.length<5&&<div style={{textAlign:"center",padding:"8px 0",fontFamily:"Orbitron,monospace",fontSize:7,color:"#1a3a55",animation:"pu 1.5s ease infinite"}}>ESPERANDO JUGADORES...</div>}
+      </div>
+      <button onClick={handleStart} disabled={starting||!fbReady||!lobby}
+        style={{width:"100%",padding:"16px",borderRadius:10,border:"2px solid "+(fbReady&&lobby?player.color.hex:"#1a3a55"),background:fbReady&&lobby?"rgba("+pRgb+",.14)":"transparent",fontFamily:"Orbitron,monospace",fontSize:12,letterSpacing:3,color:fbReady&&lobby?player.color.hex:"#2a4060",cursor:fbReady&&lobby?"pointer":"default",fontWeight:900,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+        {!fbReady?"CONECTANDO...":starting?"INICIANDO...":"INICIAR PARTIDA"}
+      </button>
+      <button onClick={async()=>{ try{ await window.storage.delete(LOBBY_KEY+code,true); }catch(e){} onBack(); }}
+        style={{width:"100%",padding:"12px",borderRadius:10,border:"1px solid #1a3a55",background:"transparent",fontFamily:"Orbitron,monospace",fontSize:10,letterSpacing:3,color:"#3a6080",cursor:"pointer",marginTop:8,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+        CANCELAR PARTIDA
+      </button>
+    </div>
+  );
+}
+
+// Join Lobby
+function JoinLobby({player,onBack,onGameStart,play}){
+  const [code,setCode]=useState("");
+  const [status,setStatus]=useState("idle");
+  const [lobby,setLobby]=useState(null);
+  const [err,setErr]=useState("");
+  const [fbReady,setFbReady]=useState(true);
+  const unsub=useRef(null);
+  useFirebase(()=>setFbReady(true));
+  const handleJoin=async()=>{
+    if(code.length!==6){ setErr("El codigo debe tener 6 digitos"); return; }
+    setStatus("joining"); setErr("");
+    const data=await fGet(code);
+    if(!data){ setStatus("error"); setErr("Codigo no encontrado. Asegurate de estar en la misma sesion del artifact."); return; }
+    if(data.status==="started"){ setStatus("error"); setErr("La partida ya comenzo"); return; }
+    if((data.players||[]).length>=5){ setStatus("error"); setErr("Sala llena"); return; }
+    const me={name:player.name,color:player.color,ship:player.ship,pos:null,joined:Date.now()};
+    const players=[...(data.players||[]),me];
+    await fUpd(code,{players});
+    setLobby({...data,players}); setStatus("waiting");
+    unsub.current=fListen(code,d=>{
+      if(!d) return;
+      setLobby(d);
+      if(d.status==="started"){
+        if(unsub.current) unsub.current();
+        const found=(d.players||[]).find(p=>p.name===player.name&&p.ship===player.ship);
+        play("newround");
+        onGameStart({code,lobby:d,myPlanetId:found?found.planetId:"verdia",myPlanet:found?found.planetName:"VERDIA",isHost:false});
+      }
+    });
+  };
+  useEffect(()=>()=>{ if(unsub.current) unsub.current(); },[]);
+  if(status==="waiting"&&lobby) return(
+    <div style={{minHeight:"100dvh",background:"#060c14",fontFamily:"'Exo 2',sans-serif",color:"#c8e8ff",padding:"20px 16px 40px",maxWidth:440,margin:"0 auto"}}>
+      <style>{"@keyframes pu{0%,100%{opacity:.5}50%{opacity:1}}"}</style>
+      <button onClick={()=>{ if(unsub.current) unsub.current(); setStatus("idle"); setLobby(null); }} style={{background:"transparent",border:"none",color:"#3a6080",fontFamily:"Orbitron,monospace",fontSize:8,cursor:"pointer",marginBottom:16,padding:0}}>← SALIR DE SALA</button>
+      <div style={{textAlign:"center",marginBottom:24,marginTop:32}}>
+        <div style={{fontSize:44,marginBottom:8,animation:"pu 1.5s ease infinite"}}>{player.ship}</div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:16,fontWeight:900,color:player.color.hex}}>{player.name}</div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:"#3a6080",marginTop:6,animation:"pu 1.5s ease infinite"}}>ESPERANDO QUE EL HOST INICIE...</div>
+      </div>
+      <div style={{textAlign:"center",padding:"14px",borderRadius:12,border:"1px solid #1a3a55",marginBottom:20}}>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:"#3a6080",marginBottom:4}}>CODIGO</div>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:34,fontWeight:900,color:"#00c8ff",letterSpacing:8}}>{code}</div>
+      </div>
+      <div style={{background:"rgba(255,255,255,.02)",border:"1px solid #1a3a55",borderRadius:10,padding:"14px 12px"}}>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:"#3a6080",marginBottom:10}}>EN LA SALA ({(lobby.players||[]).length})</div>
+        {(lobby.players||[]).map((p,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:8,border:"1px solid rgba("+rgb(p.color?p.color.hex:"#00c8ff")+",.2)",background:"rgba("+rgb(p.color?p.color.hex:"#00c8ff")+",.05)",marginBottom:5}}>
+            <span style={{fontSize:20}}>{p.ship}</span>
+            <div style={{flex:1}}>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:9,fontWeight:700,color:p.color?p.color.hex:"#00c8ff"}}>{p.name}</div>
+              <div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:"#3a6080"}}>J{i+1} - {i<PLANET_START_ORDER.length?PLANET_START_ORDER[i].name:"Extra"}</div>
+            </div>
+            {i===0&&<div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:"#ffcc00",border:"1px solid #ffcc00",padding:"1px 4px",borderRadius:3}}>HOST</div>}
+            <div style={{width:8,height:8,borderRadius:"50%",background:"#00ff9d"}}/>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+  return(
+    <div style={{minHeight:"100dvh",background:"#060c14",fontFamily:"'Exo 2',sans-serif",color:"#c8e8ff",padding:"20px 16px 40px",maxWidth:440,margin:"0 auto"}}>
+      <style>{"@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap'); *{box-sizing:border-box} body{margin:0;background:#060c14} @keyframes pu{0%,100%{opacity:.5}50%{opacity:1}}"}</style>
+      <button onClick={onBack} style={{background:"transparent",border:"none",color:"#3a6080",fontFamily:"Orbitron,monospace",fontSize:8,cursor:"pointer",marginBottom:16,padding:0}}>← VOLVER</button>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:9,letterSpacing:3,color:"#3a6080",marginBottom:4}}>UNIRSE A PARTIDA</div>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:18,fontWeight:900,color:player.color.hex,marginBottom:24}}>{player.ship} {player.name}</div>
+      <div style={{background:"rgba(255,255,255,.02)",border:"1px solid #1a3a55",borderRadius:12,padding:"22px 16px",marginBottom:16}}>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:"#3a6080",marginBottom:12}}>INGRESA EL CODIGO</div>
+        <input value={code} onChange={e=>setCode(e.target.value.replace(/[^0-9]/g,"").slice(0,6))}
+          placeholder="000000" maxLength={6} inputMode="numeric"
+          style={{width:"100%",padding:"16px",borderRadius:10,border:"2px solid "+(code.length===6?"#00c8ff":"#1a3a55"),background:"rgba(0,0,0,.4)",color:"#00c8ff",fontFamily:"Orbitron,monospace",fontSize:30,letterSpacing:10,textAlign:"center",outline:"none"}}/>
+        {err&&<div style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#ff5555",marginTop:8,textAlign:"center"}}>{err}</div>}
+      </div>
+      {!fbReady&&<div style={{textAlign:"center",fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080",animation:"pu 1.2s ease infinite",marginBottom:10}}>CONECTANDO...</div>}
+      <button onClick={handleJoin} disabled={status==="joining"||code.length!==6||!fbReady}
+        style={{width:"100%",padding:"16px",borderRadius:10,border:"2px solid "+(code.length===6&&fbReady?"#00c8ff":"#1a3a55"),background:code.length===6&&fbReady?"rgba(0,200,255,.12)":"transparent",fontFamily:"Orbitron,monospace",fontSize:12,letterSpacing:3,color:code.length===6&&fbReady?"#00c8ff":"#2a4060",cursor:code.length===6&&fbReady?"pointer":"default",fontWeight:900,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+        {!fbReady?"CONECTANDO...":status==="joining"?"BUSCANDO...":"UNIRSE"}
+      </button>
+    </div>
+  );
+}
+
+// MAIN APP
+function App(){
+  const [screen,setScreen]=useState("menu");
+  const [lobbyData,setLobbyData]=useState(null);
+  const [player,setPlayer]=useState(null);
+  const [resSlots,setResSlots]=useState(initRes());
+  const [roundHistory,setRoundHistory]=useState([]);
+  const [currentRound,setCurrentRound]=useState(1);
+  const [sequence,setSequence]=useState([]);
+  const [unlocked,setUnlocked]=useState([]);
+  const [seqHistory,setSeqHistory]=useState([]);
+  const [gStats,setGStats]=useState({seqLost:0,fullTrips:0,marketBuys:[],consumablesUsed:0});
+  const [ownedPerks,setOwnedPerks]=useState([]);
+  const [extraDice,setExtraDice]=useState([]);
+  const [boughtNC,setBoughtNC]=useState(0);
+  const [consUsed,setConsUsed]=useState(0);
+  const [anim,setAnim]=useState(null);
+  const [powerAnim,setPowerAnim]=useState(false);
+  const [buyAnim,setBuyAnim]=useState(false);
+  const [shaking,setShaking]=useState(false);
+  const [tab,setTab]=useState("board");
+  const [confirm,setConfirm]=useState(null);
+  const [showPay,setShowPay]=useState(false);
+  const [payPending,setPayPending]=useState(null);
+  const [showEndStats,setShowEndStats]=useState(false);
+  const [timer,setTimer]=useState(0);
+  const play=useAudio();
+
+  useEffect(()=>{ if(screen!=="game") return; const id=setInterval(()=>setTimer(t=>t+1),1000); return()=>clearInterval(id); },[screen]);
+
+  const toggleSlot=(resId,idx)=>{
+    setResSlots(prev=>{
+      const copy={...prev,[resId]:[...prev[resId]]};
+      if(copy[resId][idx]===0){ copy[resId][idx]=1; play(RESOURCES.find(r=>r.id===resId).sound); }
+      else{ copy[resId][idx]=0; play("undo"); }
+      return copy;
+    });
+  };
+
+  const handleOrbitTap=(planetId)=>{
+    if(sequence.includes(planetId)||sequence.length>=PLANETS.length) return;
+    play(PLANETS.find(p=>p.id===planetId).sound||"click");
+    const newSeq=[...sequence,planetId];
+    setSequence(newSeq);
+    if(!unlocked.includes(planetId)) setUnlocked(u=>[...u,planetId]);
+    if(newSeq.length===PLANETS.length){
+      setAnim("victory"); setTimeout(()=>setAnim(null),2200);
+      setGStats(s=>({...s,fullTrips:s.fullTrips+1}));
+    }
+    setSeqHistory(h=>[...h,{id:planetId,round:currentRound}]);
+  };
+
+  const handleLost=()=>{
+    setConfirm({msg:"Perder la secuencia actual?",icon:"💀",okLabel:"CONFIRMAR",
+      okColor:"rgba(255,100,100,.9)",okBorder:"rgba(255,60,60,.5)",okBg:"rgba(255,30,30,.12)",
+      onOk:()=>{
+        setAnim("defeat"); setTimeout(()=>setAnim(null),1800);
+        setShaking(true); setTimeout(()=>setShaking(false),600);
+        setGStats(s=>({...s,seqLost:s.seqLost+1}));
+        setSequence([]); setConfirm(null);
+      }
+    });
+  };
+
+  const handleNewRound=()=>{
+    const gained=Object.fromEntries(RESOURCES.map(r=>[r.id,resSlots[r.id].filter(v=>v===1).length]));
+    const spent=Object.fromEntries(RESOURCES.map(r=>[r.id,0]));
+    setRoundHistory(h=>[...h,{gained,spent}]);
+    setCurrentRound(r=>r+1);
+    setBoughtNC(0); setConsUsed(0);
+    setOwnedPerks(p=>p.map(pk=>({...pk,usedThisTurn:false})));
+    setAnim("newround"); setTimeout(()=>setAnim(null),950);
+    play("newround");
+  };
+
+  const handleBuyPerk=(perk,type)=>{
+    setResSlots(prev=>{
+      const next={...prev};
+      perk.cost.forEach(c=>{
+        let rem=c.q; const arr=[...next[c.r]];
+        for(let i=arr.length-1;i>=0&&rem>0;i--) if(arr[i]===1){arr[i]=0;rem--;}
+        next[c.r]=arr;
+      });
+      return next;
+    });
+    if(type==="dice"){
+      setExtraDice(d=>[...d,perk.id]);
+    } else if(type==="consumable"){
+      setOwnedPerks(p=>[...p,{...perk,type,usedThisTurn:false}]);
+    } else {
+      setOwnedPerks(p=>[...p,{...perk,type,usedThisTurn:false}]);
+      setBoughtNC(b=>b+1);
+    }
+    setGStats(s=>({...s,marketBuys:[...s.marketBuys,{name:perk.name,emoji:perk.emoji||"🎲",type,round:currentRound}]}));
+    setBuyAnim(true); setTimeout(()=>setBuyAnim(false),1000);
+    play("buy");
+  };
+
+  const handleUsePerk=(perkId,type)=>{
+    if(type==="reusable"){
+      setOwnedPerks(p=>p.map(pk=>pk.id===perkId&&!pk.usedThisTurn?{...pk,usedThisTurn:true}:pk));
+    } else if(type==="consumable"){
+      if(consUsed>=3) return;
+      setOwnedPerks(p=>{ const idx=p.findIndex(pk=>pk.id===perkId); return idx>=0?[...p.slice(0,idx),...p.slice(idx+1)]:p; });
+      setConsUsed(n=>n+1);
+      setGStats(s=>({...s,consumablesUsed:(s.consumablesUsed||0)+1}));
+      setPowerAnim(true); setTimeout(()=>setPowerAnim(false),900);
+    }
+    play("poweruse");
+  };
+
+  const handleEndGame=()=>{ play("endgame"); setShowEndStats(true); };
+
+  const resetAll=()=>{
+    setShowEndStats(false); setScreen("menu"); setLobbyData(null); setPlayer(null);
+    setResSlots(initRes()); setRoundHistory([]); setCurrentRound(1);
+    setSequence([]); setUnlocked([]); setSeqHistory([]);
+    setGStats({seqLost:0,fullTrips:0,marketBuys:[],consumablesUsed:0});
+    setPowerAnim(false); setBuyAnim(false);
+    setOwnedPerks([]); setExtraDice([]); setBoughtNC(0); setConsUsed(0);
+    setTimer(0); setTab("board");
+  };
+
+  const handleShare=async()=>{
+    const totG=Object.fromEntries(RESOURCES.map(r=>[r.id,roundHistory.reduce((a,rnd)=>a+(rnd.gained[r.id]||0),0)]));
+    const totS=Object.fromEntries(RESOURCES.map(r=>[r.id,roundHistory.reduce((a,rnd)=>a+(rnd.spent[r.id]||0),0)]));
+    const resLines=RESOURCES.map(r=>r.icon+" "+r.label+": +"+totG[r.id]+" -"+totS[r.id]+" ="+(totG[r.id]-totS[r.id])).join("\n");
+    const route=seqHistory.map((e,i)=>(i+1)+". "+pName(e.id)+" (R"+e.round+")").join(" > ");
+    const text="STELLAR EXPLORER\n"+player.ship+" "+player.name+" - "+ft(timer)+" - "+currentRound+" rondas\nPerdidas: "+gStats.seqLost+"\n\nRECURSOS:\n"+resLines+"\n\nRUTA:\n"+(route||"Ninguna");
+    try{ if(navigator.share){ await navigator.share({title:"Stellar Explorer",text}); return; } }catch(e){}
+    try{ await navigator.clipboard.writeText(text); alert("Copiado!"); }catch(e){}
+  };
+
+  // End stats
+  if(screen==="game"&&showEndStats&&player){
+    return <EndStatsOverlay player={player} roundHistory={roundHistory} gStats={gStats} timer={timer}
+      seqHistory={seqHistory} unlocked={unlocked} ownedPerks={ownedPerks} extraDice={extraDice} onClose={resetAll}/>;
+  }
+
+  // Screen routing
+  if(screen==="menu") return <LobbyMenu onCreate={()=>setScreen("sc")} onJoin={()=>setScreen("sj")} onSolo={()=>setScreen("ss")}/>;
+  if(screen==="ss") return <SetupScreen play={play} onStart={p=>{ setPlayer(p); setScreen("game"); }}/>;
+  if(screen==="sc") return <SetupScreen play={play} onStart={p=>{ setPlayer(p); setScreen("lc"); }}/>;
+  if(screen==="sj") return <SetupScreen play={play} onStart={p=>{ setPlayer(p); setScreen("lj"); }}/>;
+  if(screen==="lc"&&player) return <CreateLobby player={player} play={play} onBack={()=>setScreen("sc")} onGameStart={ld=>{ setLobbyData(ld); setCurrentRound(1); setScreen("game"); }}/>;
+  if(screen==="lj"&&player) return <JoinLobby player={player} play={play} onBack={()=>setScreen("sj")} onGameStart={ld=>{ setLobbyData(ld); setCurrentRound(1); setScreen("game"); }}/>;
+  if(!player) return <LobbyMenu onCreate={()=>setScreen("sc")} onJoin={()=>setScreen("sj")}/>;
+
+  const pColor=player.color.hex;
+  const pRgb=rgb(pColor);
+  const permCount=ownedPerks.filter(p=>p.type==="permanent").length;
+  if(showPay){
+    const pending = payPending || Object.fromEntries(RESOURCES.map(r=>[r.id,0]));
+    const total = Object.values(pending).reduce((a,b)=>a+b,0);
+    const adj = (resId,delta) => {
+      const avail = resSlots[resId].filter(v=>v===1).length;
+      const cur = pending[resId]||0;
+      setPayPending({...pending,[resId]:Math.max(0,Math.min(avail,cur+delta))});
+    };
+    const confirmPay = () => {
+      if(total===0) return;
+      setResSlots(prev=>{
+        const next={...prev};
+        RESOURCES.forEach(res=>{
+          let rem=pending[res.id]||0; const arr=[...next[res.id]];
+          for(let i=arr.length-1;i>=0&&rem>0;i--) if(arr[i]===1){arr[i]=0;rem--;}
+          next[res.id]=arr;
+        });
+        return next;
+      });
+      setPayPending(null); setShowPay(false);
+    };
+    return(
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",display:"flex",alignItems:"flex-end",zIndex:100}} onClick={()=>{setShowPay(false);setPayPending(null);}}>
+        <div style={{width:"100%",maxWidth:440,margin:"0 auto",background:"#0a1520",borderRadius:"18px 18px 0 0",padding:"20px 16px 36px"}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:9,letterSpacing:3,color:"#3a6080",marginBottom:16,textAlign:"center"}}>PAGAR RECURSOS</div>
+          {RESOURCES.map(res=>{
+            const avail=resSlots[res.id].filter(v=>v===1).length;
+            const amt=pending[res.id]||0;
+            return(
+              <div key={res.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+                <span style={{fontSize:18,width:24}}>{res.icon}</span>
+                <div style={{fontFamily:"Orbitron,monospace",fontSize:7,color:res.color,flex:1}}>{res.label}</div>
+                <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:"#3a6080",width:28,textAlign:"center"}}>{avail}</div>
+                <button onClick={()=>adj(res.id,-1)} style={{width:30,height:30,borderRadius:7,border:"1.5px solid "+(amt>0?"rgba(255,80,50,.5)":"#1a3a55"),background:amt>0?"rgba(255,50,20,.15)":"transparent",color:amt>0?"#ff7755":"#2a4060",fontSize:18,cursor:amt>0?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>-</button>
+                <div style={{fontFamily:"Orbitron,monospace",fontSize:14,fontWeight:700,color:amt>0?"#ff9955":"#3a6080",width:24,textAlign:"center"}}>{amt}</div>
+                <button onClick={()=>adj(res.id,1)} style={{width:30,height:30,borderRadius:7,border:"1.5px solid "+(amt<avail?"rgba(0,200,100,.5)":"#1a3a55"),background:amt<avail?"rgba(0,180,80,.15)":"transparent",color:amt<avail?"#44ff88":"#2a4060",fontSize:18,cursor:amt<avail?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>+</button>
+              </div>
+            );
+          })}
+          <div style={{display:"flex",gap:10,marginTop:16}}>
+            <button onClick={()=>{setShowPay(false);setPayPending(null);}} style={{flex:1,padding:"11px",borderRadius:9,border:"1px solid #1a3a55",background:"transparent",fontFamily:"Orbitron,monospace",fontSize:9,color:"#3a6080",cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>CANCELAR</button>
+            <button onClick={confirmPay} style={{flex:2,padding:"11px",borderRadius:9,border:"1.5px solid "+(total>0?"rgba(255,150,60,.5)":"#1a3a55"),background:total>0?"rgba(255,100,30,.1)":"transparent",fontFamily:"Orbitron,monospace",fontSize:9,color:total>0?"rgba(255,170,90,.9)":"#2a4060",cursor:total>0?"pointer":"default",fontWeight:700,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+              PAGAR {total>0?"("+total+")":""}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Confirm modal
+  if(confirm){
+    return(
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px",zIndex:100}}>
+        <div style={{width:"100%",maxWidth:340,background:"#0a1520",borderRadius:16,padding:"24px 20px",border:"1px solid #1a3a55"}}>
+          <div style={{textAlign:"center",fontSize:36,marginBottom:12}}>{confirm.icon}</div>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,color:"#c8e8ff",textAlign:"center",lineHeight:1.8,marginBottom:20}}>{confirm.msg}</div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>setConfirm(null)} style={{flex:1,padding:"11px",borderRadius:9,border:"1px solid #1a3a55",background:"transparent",fontFamily:"Orbitron,monospace",fontSize:8,color:"#3a6080",cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>CANCELAR</button>
+            <button onClick={confirm.onOk} style={{flex:1,padding:"11px",borderRadius:9,border:"1.5px solid "+confirm.okBorder,background:confirm.okBg,fontFamily:"Orbitron,monospace",fontSize:8,color:confirm.okColor,cursor:"pointer",fontWeight:700,userSelect:"none",WebkitTapHighlightColor:"transparent"}}>{confirm.okLabel}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return(
+    <div style={{maxWidth:440,margin:"0 auto",minHeight:"100dvh",background:"#060c14",display:"flex",flexDirection:"column",fontFamily:"'Exo 2',sans-serif",color:"#c8e8ff",position:"relative"}}>
+      <style>{"@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap'); *{box-sizing:border-box} body{margin:0;background:#060c14}"}</style>
+      {anim==="newround"&&<NewRoundFlash/>}
+      {anim&&anim!=="newround"&&<Particles type={anim}/>}
+      {powerAnim&&<PowerBurst/>}
+      {buyAnim&&<BuyBurst/>}
+
+      <div style={{padding:"10px 14px 8px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #1a3a55"}}>
+        <div style={{display:"flex",alignItems:"center",gap:9}}>
+          <div style={{fontSize:22}}>{player.ship}</div>
+          <div>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:12,fontWeight:900,color:pColor,letterSpacing:2,textShadow:"0 0 10px rgba("+pRgb+",.5)"}}>{player.name}</div>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#3a6080",letterSpacing:1}}>
+              R{currentRound}{lobbyData?" - "+lobbyData.code:""} - {unlocked.length}/7 - 🎲{3+extraDice.length}
+            </div>
+          </div>
+        </div>
+        <button onClick={handleEndGame} style={{padding:"6px 9px",borderRadius:7,border:"1.5px solid rgba(255,150,50,.4)",background:"rgba(255,100,20,.08)",fontFamily:"Orbitron,monospace",fontSize:6.5,letterSpacing:1,color:"rgba(255,160,70,.9)",cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>FIN</button>
+      </div>
+
+      <div style={{display:"flex",padding:"7px 14px 0",gap:5}}>
+        {TABS.map(t=>(
+          <div key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"6px 4px",borderRadius:8,textAlign:"center",border:"1.5px solid "+(tab===t.id?pColor:"#1a3a55"),background:tab===t.id?"rgba("+pRgb+",.08)":"transparent",cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+            <div style={{fontSize:15,lineHeight:1,marginBottom:2}}>{t.icon}</div>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,letterSpacing:1.5,color:tab===t.id?pColor:"#3a6080"}}>{t.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{flex:1,padding:"11px 14px 32px",overflowY:"auto"}}>
+        {tab==="board"&&(<>
+          {lobbyData&&(
+            <div style={{padding:"7px 12px",borderRadius:8,border:"1px solid rgba(0,200,255,.2)",background:"rgba(0,200,255,.05)",marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:18}}>{(PLANETS.find(p=>p.id===lobbyData.myPlanetId)||{icon:"🌌"}).icon}</span>
+              <div>
+                <div style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080"}}>PLANETA INICIAL</div>
+                <div style={{fontFamily:"Orbitron,monospace",fontSize:10,fontWeight:700,color:"#00c8ff"}}>{lobbyData.myPlanet||"VERDIA"}</div>
+              </div>
+              <div style={{marginLeft:"auto",fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#3a6080"}}>{lobbyData.isHost?"HOST":"JUGADOR"} #{lobbyData.code}</div>
+            </div>
+          )}
+          {(ownedPerks.length>0||extraDice.length>0)&&(
+            <>
+              <ActivePerks ownedPerks={ownedPerks} onUsePerk={handleUsePerk} consumablesUsedThisTurn={consUsed} extraDice={extraDice}/>
+              <div style={{height:1,background:"linear-gradient(90deg,transparent,#1a3a55,transparent)",margin:"12px 0"}}/>
+            </>
+          )}
+          <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"center"}}>
+            <div style={{flex:1,padding:"7px 11px",borderRadius:8,border:"1px solid rgba("+pRgb+",.2)",background:"rgba("+pRgb+",.05)",fontFamily:"Orbitron,monospace",fontSize:8,color:pColor,letterSpacing:2}}>RONDA {currentRound}</div>
+            <button onClick={handleNewRound} style={{padding:"7px 12px",borderRadius:8,border:"1.5px solid "+pColor,background:"rgba("+pRgb+",.1)",fontFamily:"Orbitron,monospace",fontSize:8,color:pColor,cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>+ RONDA</button>
+          </div>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:4}}>RECURSOS</div>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#1a4a6a",marginBottom:9}}>TAP = MARCAR - TAP VERDE = DESMARCAR</div>
+          {RESOURCES.map(res=><ResourceRow key={res.id} res={res} slots={resSlots[res.id]} onToggle={i=>toggleSlot(res.id,i)}/>)}
+          <button onClick={()=>setShowPay(true)} style={{width:"100%",padding:"11px",borderRadius:9,border:"1.5px solid rgba(255,150,60,.5)",background:"rgba(255,100,30,.08)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent",marginTop:4,marginBottom:14}}>
+            <span style={{fontSize:17}}>💸</span><span style={{fontFamily:"Orbitron,monospace",fontSize:9,letterSpacing:3,color:"rgba(255,170,90,.9)",fontWeight:700}}>PAGAR RECURSOS</span><span style={{fontSize:17}}>💸</span>
+          </button>
+          <div style={{height:1,background:"linear-gradient(90deg,transparent,#1a3a55,transparent)",margin:"0 0 14px"}}/>
+          <PlanetSection sequence={sequence} unlocked={unlocked} onOrbitTap={handleOrbitTap} onSeqRemove={pid=>setSequence(s=>s.filter(p=>p!==pid))} shaking={shaking}/>
+          <div style={{height:1,background:"linear-gradient(90deg,transparent,#1a3a55,transparent)",margin:"14px 0"}}/>
+          <div onClick={handleLost} style={{width:"100%",padding:"11px",borderRadius:8,border:"1.5px solid rgba(255,60,60,.35)",background:"rgba(255,30,30,.07)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
+            <span style={{fontSize:15}}>💀</span><span style={{fontFamily:"Orbitron,monospace",fontSize:9,letterSpacing:3,color:"rgba(255,100,100,.85)",fontWeight:700}}>SECUENCIA PERDIDA</span><span style={{fontSize:15}}>💀</span>
+          </div>
+        </>)}
+        {tab==="market"&&(
+          <MarketTab resSlots={resSlots} unlocked={unlocked} ownedPerks={ownedPerks}
+            boughtNC={boughtNC} consumablesUsed={consUsed}
+            onBuy={handleBuyPerk} onUsePerk={handleUsePerk} extraDice={extraDice}/>
+        )}
+        {tab==="stats"&&(
+          <StatsScreen roundHistory={roundHistory} gStats={gStats} timer={timer} seqHistory={seqHistory}
+            unlocked={unlocked} ownedPerks={ownedPerks} extraDice={extraDice} player={player}
+            onShare={handleShare} currentRound={currentRound}/>
+        )}
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
