@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <title>Stellar Explorer</title>
 <style>*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}html,body{height:100%;background:#060c14;overflow:hidden}#root{height:100dvh;overflow-y:auto;background:#060c14}</style>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet"/>
@@ -53,11 +54,11 @@ const PLAYER_COLORS = [
 ];
 
 const PLANET_START_ORDER = [
-  { planetId:"verdia",   name:"VERDIA",   icon:"🌱", note:"Gratis Early" },
-  { planetId:"aqua",     name:"AQUA",     icon:"🌊", note:"1⚡ Early"    },
-  { planetId:"pyron",    name:"PYRON",    icon:"🔥", note:"Gratis Riesgo"},
-  { planetId:"terraza",  name:"TERRAX",   icon:"⛏",  note:"1🌿 Mid"      },
-  { planetId:"neuronix", name:"NEURONIX", icon:"🧬", note:"1⚡ Mid"      },
+  { planetId:"verdia",   name:"VERDIA",   icon:"🌱", note:"Gratis" },
+  { planetId:"aqua",     name:"AQUA",     icon:"🌊", note:"1🌿"    },
+  { planetId:"pyron",    name:"PYRON",    icon:"🔥", note:"1💧"    },
+  { planetId:"terraza",  name:"TERRAX",   icon:"⛏",  note:"1⚡+1🌿"},
+  { planetId:"neuronix", name:"NEURONIX", icon:"🧬", note:"1⚡+1💧"},
 ];
 
 const PERKS = {
@@ -253,8 +254,8 @@ function ResourceRow({res,slots,onToggle}){
     <div style={{marginBottom:10,padding:"8px 10px",borderRadius:9,border:"1px solid rgba("+res.rgb+",.18)",background:"rgba("+res.rgb+",.05)"}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
         <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,border:"1.5px solid "+res.color,background:"rgba("+res.rgb+",.1)"}}>{res.icon}</div>
-        <div style={{fontFamily:"Orbitron,monospace",fontSize:7,letterSpacing:1,color:"rgba(200,232,255,.6)",flex:1}}>{res.label}</div>
-        <span style={{fontFamily:"Orbitron,monospace",fontSize:11,fontWeight:700,color:gained>0?res.color:"#3a6080"}}>{gained}</span>
+        <div style={{fontFamily:"Orbitron,monospace",fontSize:9,letterSpacing:1,color:"rgba(200,232,255,.6)",flex:1}}>{res.label}</div>
+        <span style={{fontFamily:"Orbitron,monospace",fontSize:14,fontWeight:700,color:gained>0?res.color:"#3a6080"}}>{gained}</span>
       </div>
       <div style={{display:"flex",gap:3}}>
         {slots.map((state,i)=>(
@@ -370,7 +371,7 @@ function ActivePerks({ownedPerks,onUsePerk,consumablesUsedThisTurn,extraDice}){
 function PlanetSection({sequence,unlocked,onOrbitTap,onSeqRemove,shaking}){
   return(
     <>
-      <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:4}}>SISTEMA ESTELAR</div>
+      <div style={{fontFamily:"Orbitron,monospace",fontSize:10,letterSpacing:3,color:"#3a6080",marginBottom:4}}>SISTEMA ESTELAR</div>
       <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#1a4a6a",marginBottom:10}}>TAP = AGREGAR A SECUENCIA</div>
       <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
         <div style={{position:"relative",width:"100%",maxWidth:290,aspectRatio:"1/1"}}>
@@ -387,7 +388,7 @@ function PlanetSection({sequence,unlocked,onOrbitTap,onSeqRemove,shaking}){
                 <div style={{width:"100%",height:"100%",borderRadius:"50%",border:"2px solid "+planet.color,background:inSeq?"rgba("+rgb(planet.color)+",.03)":"rgba("+rgb(planet.color)+",.1)",boxShadow:inSeq?"none":isUnlocked?"0 0 14px rgba("+rgb(planet.color)+",.55)":"0 0 8px rgba("+rgb(planet.color)+",.25)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative"}}>
                   {isUnlocked&&!inSeq&&<div style={{position:"absolute",top:-3,right:-3,width:13,height:13,borderRadius:"50%",background:"#00ff9d",border:"1.5px solid #060c14",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,color:"#060c14",fontWeight:900}}>v</div>}
                   <div style={{fontSize:15,lineHeight:1}}>{planet.icon}</div>
-                  <div style={{fontFamily:"Orbitron,monospace",fontSize:4.5,color:planet.color,marginTop:2}}>{planet.label}</div>
+                  <div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:planet.color,marginTop:2}}>{planet.label}</div>
                 </div>
               </div>
             );
@@ -451,7 +452,7 @@ function MarketTab({resSlots,unlocked,ownedPerks,boughtNC,consumablesUsed,onBuy,
         {Object.entries(PERK_TYPE_META).map(([type,m])=>(
           <div key={type} onClick={()=>setActiveType(type)} style={{flex:1,padding:"7px 4px",borderRadius:8,textAlign:"center",border:"1.5px solid "+(activeType===type?m.color:"#1a3a55"),background:activeType===type?"rgba("+rgb(m.color)+",.1)":"transparent",cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
             <div style={{fontSize:16,lineHeight:1,marginBottom:2}}>{m.emoji}</div>
-            <div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:activeType===type?m.color:"#3a6080"}}>{m.label}</div>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:7.5,color:activeType===type?m.color:"#3a6080"}}>{m.label}</div>
           </div>
         ))}
       </div>
@@ -474,10 +475,10 @@ function MarketTab({resSlots,unlocked,ownedPerks,boughtNC,consumablesUsed,onBuy,
               <div style={{fontSize:26,flexShrink:0}}>{perk.emoji}</div>
               <div style={{flex:1}}>
                 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-                  <span style={{fontFamily:"Orbitron,monospace",fontSize:9,fontWeight:700,color:owned?meta.color:"#c8e8ff"}}>{perk.name}</span>
+                  <span style={{fontFamily:"Orbitron,monospace",fontSize:11,fontWeight:700,color:owned?meta.color:"#c8e8ff"}}>{perk.name}</span>
                   {owned&&<span style={{fontFamily:"Orbitron,monospace",fontSize:7,color:meta.color,border:"1px solid "+meta.color,padding:"1px 4px",borderRadius:3}}>{isCons?"x"+ownedCnt:"ok"}</span>}
                 </div>
-                <div style={{fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080",lineHeight:1.5,marginBottom:4}}>{perk.effect}</div>
+                <div style={{fontFamily:"Orbitron,monospace",fontSize:8.5,color:"#3a6080",lineHeight:1.6,marginBottom:4}}>{perk.effect}</div>
                 {perk.req&&perk.req.length>0&&<><div style={{fontFamily:"Orbitron,monospace",fontSize:6,color:"#3a6080",marginBottom:2}}>REQUIERE:</div><ReqBadge req={perk.req}/></>}
                 <CostBadge cost={perk.cost}/>
                 {!reqMet&&<div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#ff4444",marginTop:5}}>Necesitas desbloquear planetas requeridos</div>}
@@ -893,6 +894,22 @@ function App(){
 
   useEffect(()=>{ if(screen!=="game") return; const id=setInterval(()=>setTimer(t=>t+1),1000); return()=>clearInterval(id); },[screen]);
 
+  // Non-host: sync round from Firebase
+  useEffect(()=>{
+    if(screen!=="game"||!lobbyData||lobbyData.isHost) return;
+    const unsub=fListen(lobbyData.code,data=>{
+      if(!data) return;
+      if(data.round&&data.round>currentRound){
+        setCurrentRound(data.round);
+        setBoughtNC(0); setConsUsed(0);
+        setOwnedPerks(p=>p.map(pk=>({...pk,usedThisTurn:false})));
+        setAnim("newround"); setTimeout(()=>setAnim(null),950);
+        play("newround");
+      }
+    });
+    return unsub;
+  },[screen,lobbyData]);
+
   const toggleSlot=(resId,idx)=>{
     setResSlots(prev=>{
       const copy={...prev,[resId]:[...prev[resId]]};
@@ -931,11 +948,16 @@ function App(){
     const gained=Object.fromEntries(RESOURCES.map(r=>[r.id,resSlots[r.id].filter(v=>v===1).length]));
     const spent=Object.fromEntries(RESOURCES.map(r=>[r.id,0]));
     setRoundHistory(h=>[...h,{gained,spent}]);
-    setCurrentRound(r=>r+1);
+    const nextRound=currentRound+1;
+    setCurrentRound(nextRound);
     setBoughtNC(0); setConsUsed(0);
     setOwnedPerks(p=>p.map(pk=>({...pk,usedThisTurn:false})));
     setAnim("newround"); setTimeout(()=>setAnim(null),950);
     play("newround");
+    // Sync round to Firebase if host
+    if(lobbyData&&lobbyData.isHost){
+      fUpd(lobbyData.code,{round:nextRound}).catch(()=>{});
+    }
   };
 
   const handleBuyPerk=(perk,type)=>{
@@ -1092,7 +1114,7 @@ function App(){
         <div style={{display:"flex",alignItems:"center",gap:9}}>
           <div style={{fontSize:22}}>{player.ship}</div>
           <div>
-            <div style={{fontFamily:"Orbitron,monospace",fontSize:12,fontWeight:900,color:pColor,letterSpacing:2,textShadow:"0 0 10px rgba("+pRgb+",.5)"}}>{player.name}</div>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:15,fontWeight:900,color:pColor,letterSpacing:2,textShadow:"0 0 10px rgba("+pRgb+",.5)"}}>{player.name}</div>
             <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#3a6080",letterSpacing:1}}>
               R{currentRound}{lobbyData?" - "+lobbyData.code:""} - {unlocked.length}/7 - 🎲{3+extraDice.length}
             </div>
@@ -1105,7 +1127,7 @@ function App(){
         {TABS.map(t=>(
           <div key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,padding:"6px 4px",borderRadius:8,textAlign:"center",border:"1.5px solid "+(tab===t.id?pColor:"#1a3a55"),background:tab===t.id?"rgba("+pRgb+",.08)":"transparent",cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
             <div style={{fontSize:15,lineHeight:1,marginBottom:2}}>{t.icon}</div>
-            <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,letterSpacing:1.5,color:tab===t.id?pColor:"#3a6080"}}>{t.label}</div>
+            <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:1.5,color:tab===t.id?pColor:"#3a6080"}}>{t.label}</div>
           </div>
         ))}
       </div>
@@ -1129,20 +1151,25 @@ function App(){
             </>
           )}
           <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"center"}}>
-            <div style={{flex:1,padding:"7px 11px",borderRadius:8,border:"1px solid rgba("+pRgb+",.2)",background:"rgba("+pRgb+",.05)",fontFamily:"Orbitron,monospace",fontSize:8,color:pColor,letterSpacing:2}}>RONDA {currentRound}</div>
-            <button onClick={handleNewRound} style={{padding:"7px 12px",borderRadius:8,border:"1.5px solid "+pColor,background:"rgba("+pRgb+",.1)",fontFamily:"Orbitron,monospace",fontSize:8,color:pColor,cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>+ RONDA</button>
+            <div style={{flex:1,padding:"7px 11px",borderRadius:8,border:"1px solid rgba("+pRgb+",.2)",background:"rgba("+pRgb+",.05)",fontFamily:"Orbitron,monospace",fontSize:10,fontWeight:700,color:pColor,letterSpacing:2}}>RONDA {currentRound}</div>
+            {(!lobbyData||lobbyData.isHost)&&(
+              <button onClick={handleNewRound} style={{padding:"9px 14px",borderRadius:8,border:"1.5px solid "+pColor,background:"rgba("+pRgb+",.15)",fontFamily:"Orbitron,monospace",fontSize:9,fontWeight:700,color:pColor,cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>+ RONDA</button>
+            )}
+            {lobbyData&&!lobbyData.isHost&&(
+              <div style={{padding:"7px 10px",borderRadius:8,border:"1px solid #1a3a55",fontFamily:"Orbitron,monospace",fontSize:7,color:"#3a6080",letterSpacing:1}}>HOST CONTROLA</div>
+            )}
           </div>
-          <div style={{fontFamily:"Orbitron,monospace",fontSize:8,letterSpacing:3,color:"#3a6080",marginBottom:4}}>RECURSOS</div>
+          <div style={{fontFamily:"Orbitron,monospace",fontSize:10,letterSpacing:3,color:"#3a6080",marginBottom:4}}>RECURSOS</div>
           <div style={{fontFamily:"Orbitron,monospace",fontSize:6.5,color:"#1a4a6a",marginBottom:9}}>TAP = MARCAR - TAP VERDE = DESMARCAR</div>
           {RESOURCES.map(res=><ResourceRow key={res.id} res={res} slots={resSlots[res.id]} onToggle={i=>toggleSlot(res.id,i)}/>)}
           <button onClick={()=>setShowPay(true)} style={{width:"100%",padding:"11px",borderRadius:9,border:"1.5px solid rgba(255,150,60,.5)",background:"rgba(255,100,30,.08)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent",marginTop:4,marginBottom:14}}>
-            <span style={{fontSize:17}}>💸</span><span style={{fontFamily:"Orbitron,monospace",fontSize:9,letterSpacing:3,color:"rgba(255,170,90,.9)",fontWeight:700}}>PAGAR RECURSOS</span><span style={{fontSize:17}}>💸</span>
+            <span style={{fontSize:17}}>💸</span><span style={{fontFamily:"Orbitron,monospace",fontSize:11,letterSpacing:3,color:"rgba(255,170,90,.9)",fontWeight:700}}>PAGAR RECURSOS</span><span style={{fontSize:17}}>💸</span>
           </button>
           <div style={{height:1,background:"linear-gradient(90deg,transparent,#1a3a55,transparent)",margin:"0 0 14px"}}/>
           <PlanetSection sequence={sequence} unlocked={unlocked} onOrbitTap={handleOrbitTap} onSeqRemove={pid=>setSequence(s=>s.filter(p=>p!==pid))} shaking={shaking}/>
           <div style={{height:1,background:"linear-gradient(90deg,transparent,#1a3a55,transparent)",margin:"14px 0"}}/>
           <div onClick={handleLost} style={{width:"100%",padding:"11px",borderRadius:8,border:"1.5px solid rgba(255,60,60,.35)",background:"rgba(255,30,30,.07)",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",userSelect:"none",WebkitTapHighlightColor:"transparent"}}>
-            <span style={{fontSize:15}}>💀</span><span style={{fontFamily:"Orbitron,monospace",fontSize:9,letterSpacing:3,color:"rgba(255,100,100,.85)",fontWeight:700}}>SECUENCIA PERDIDA</span><span style={{fontSize:15}}>💀</span>
+            <span style={{fontSize:15}}>💀</span><span style={{fontFamily:"Orbitron,monospace",fontSize:11,letterSpacing:3,color:"rgba(255,100,100,.85)",fontWeight:700}}>SECUENCIA PERDIDA</span><span style={{fontSize:15}}>💀</span>
           </div>
         </>)}
         {tab==="market"&&(
